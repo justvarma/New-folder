@@ -133,7 +133,7 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 ```
 
-**dashboard/.env:**
+**HACKATHON/.env:**
 ```env
 VITE_API_BASE=http://localhost:8001
 VITE_ALERTS_BASE=http://localhost:8001
@@ -211,13 +211,11 @@ Expected output:
  public | event | table | lemap
 ```
 
-### Step 6: Install Python Dependencies
+### Step 6: Install Python Dependencies (Without Virtual Environment)
+
+**If you got the venv permission error, just install directly:**
 
 ```powershell
-# Create and activate virtual environment (optional but recommended)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
 # Install Gateway dependencies
 cd gateway
 pip install -r requirements.txt
@@ -234,10 +232,22 @@ pip install -r requirements.txt
 cd ..
 ```
 
+**Optional: If you want to try venv again:**
+
+```powershell
+# Close ALL Python terminals first
+# Then:
+Remove-Item -Recurse -Force .venv
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Then install dependencies as above
+```
+
 ### Step 7: Install Dashboard Dependencies
 
 ```powershell
-cd dashboard
+cd HACKATHON
 npm install
 cd ..
 ```
@@ -251,9 +261,6 @@ You need to open **5 separate PowerShell windows**.
 ### Terminal 1: Gateway API (Port 8000)
 
 ```powershell
-# Activate venv if you created one
-.\.venv\Scripts\Activate.ps1
-
 cd gateway
 python main.py
 ```
@@ -269,9 +276,6 @@ python main.py
 ### Terminal 2: Dashboard API (Port 8001)
 
 ```powershell
-# Activate venv if you created one
-.\.venv\Scripts\Activate.ps1
-
 cd api
 python main.py
 ```
@@ -289,9 +293,6 @@ python main.py
 ### Terminal 3: Event Processor
 
 ```powershell
-# Activate venv if you created one
-.\.venv\Scripts\Activate.ps1
-
 cd processor
 python processor.py
 ```
@@ -306,9 +307,6 @@ python processor.py
 ### Terminal 4: Event Simulator
 
 ```powershell
-# Activate venv if you created one
-.\.venv\Scripts\Activate.ps1
-
 cd processor
 python simulator.py
 ```
@@ -322,7 +320,7 @@ python simulator.py
 ### Terminal 5: React Dashboard
 
 ```powershell
-cd dashboard
+cd HACKATHON
 npm run dev
 ```
 
@@ -588,36 +586,44 @@ docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FRO
 
 ---
 
-### Test 7: Check Redis
-
-```powershell
-# View event counters
-docker exec lemap_redis redis-cli KEYS "event_count:*"
-
-# View hub status
-docker exec lemap_redis redis-cli GET "hub_status:Delhi"
-
-# View all hub statuses
-"Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad" | ForEach-Object {
-    $status = docker exec lemap_redis redis-cli GET "hub_status:$_"
-    Write-Host "$_ : $status"
-}
-```
-
----
-
-### Test 8: Access Dashboard
+### Test 7: Access Dashboard
 
 Open browser: **http://localhost:5173**
 
-Your dashboard should show:
-- ✅ Events list (with hub filter option)
-- ✅ Alerts list (with hub filter option)
-- ✅ Hub status indicators (red/green)
+Your dashboard should connect to these 3 endpoints:
+- ✅ `GET /events` - Display all events
+- ✅ `GET /alerts` - Display all alerts  
+- ✅ `GET /hub-status` - Show red/green hub status
 
 ---
 
 ## 🐛 Troubleshooting
+
+### Issue: "Permission denied" creating venv
+
+**Solution:**
+
+```powershell
+# Option 1: Delete and recreate
+Remove-Item -Recurse -Force .venv
+python -m venv .venv
+
+# Option 2: Skip venv entirely (easier)
+# Just install packages directly without venv
+cd gateway
+pip install -r requirements.txt
+cd ..
+
+cd processor  
+pip install -r requirements.txt
+cd ..
+
+cd api
+pip install -r requirements.txt
+cd ..
+```
+
+---
 
 ### Issue: "Docker is not running"
 
@@ -668,7 +674,9 @@ Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 **Solution:**
 
 ```powershell
-# Reinstall dependencies
+# Make sure you're in the project root
+# Then reinstall dependencies
+
 cd gateway
 pip install -r requirements.txt
 cd ..
@@ -693,19 +701,33 @@ cd ..
    Invoke-WebRequest http://localhost:8001/events
    ```
 
-2. **Check dashboard .env file:**
+2. **Check HACKATHON/.env file:**
    ```powershell
-   Get-Content dashboard\.env
+   Get-Content HACKATHON\.env
    ```
    Should show: `VITE_API_BASE=http://localhost:8001`
 
 3. **Restart dashboard:**
    ```powershell
-   cd dashboard
+   cd HACKATHON
    npm run dev
    ```
 
 4. **Check browser console** (F12) for errors
+
+---
+
+### Issue: "npm: command not found"
+
+**Solution:**
+
+```powershell
+# Install Node.js from https://nodejs.org/
+# Restart PowerShell after installation
+# Verify:
+node --version
+npm --version
+```
 
 ---
 
@@ -735,24 +757,6 @@ Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
 
 ---
 
-### Issue: "Simulator not generating events"
-
-**Solution:**
-
-```powershell
-# Check if Gateway is running
-Invoke-WebRequest http://localhost:8000/docs
-
-# Check simulator logs - should show:
-# ✅ [1] Delhi | ORDER_DELAYED
-
-# If showing connection errors:
-# 1. Verify Gateway is running on port 8000
-# 2. Check API_KEY in processor/.env matches gateway/.env
-```
-
----
-
 ## 📊 Quick Commands Reference
 
 ```powershell
@@ -769,10 +773,6 @@ docker-compose down
 # View logs
 docker-compose logs -f
 
-# View specific service logs
-docker-compose logs -f postgres
-docker-compose logs -f redis
-
 # Restart services
 docker-compose restart
 
@@ -782,18 +782,9 @@ docker volume prune -f
 docker-compose up -d
 Start-Sleep -Seconds 20
 
-# Check running containers
-docker ps
-
-# Check container resource usage
-docker stats
-
 # ========================================
 # Database Commands
 # ========================================
-
-# Connect to PostgreSQL
-docker exec -it lemap_postgres psql -U lemap -d lemapdb
 
 # View recent events
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event ORDER BY timestamp DESC LIMIT 10;"
@@ -804,39 +795,11 @@ docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert ORDE
 # Count events
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT COUNT(*) FROM event;"
 
-# Count alerts
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT COUNT(*) FROM alert;"
-
 # Events by hub
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM event GROUP BY hub;"
 
-# Alerts by hub
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM alert GROUP BY hub;"
-
 # Clear all data
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "TRUNCATE event, alert RESTART IDENTITY;"
-
-# ========================================
-# Redis Commands
-# ========================================
-
-# Connect to Redis
-docker exec -it lemap_redis redis-cli
-
-# View all keys
-docker exec lemap_redis redis-cli KEYS "*"
-
-# View event counters
-docker exec lemap_redis redis-cli KEYS "event_count:*"
-
-# View specific counter
-docker exec lemap_redis redis-cli GET "event_count:ORDER_DELAYED:Delhi"
-
-# View hub status
-docker exec lemap_redis redis-cli GET "hub_status:Delhi"
-
-# Clear all Redis data
-docker exec lemap_redis redis-cli FLUSHALL
 
 # ========================================
 # API Testing
@@ -856,26 +819,8 @@ Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
 # Get all alerts
 Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
 
-# Get alerts from specific hub
-Invoke-WebRequest "http://localhost:8001/alerts?hub=Mumbai" | ConvertFrom-Json
-
 # Get hub status
 Invoke-WebRequest http://localhost:8001/hub-status | ConvertFrom-Json
-
-# ========================================
-# Service Management
-# ========================================
-
-# Check if services are responding
-Invoke-WebRequest http://localhost:8000/docs  # Gateway docs
-Invoke-WebRequest http://localhost:8001/docs  # API docs
-Invoke-WebRequest http://localhost:5173       # Dashboard
-
-# Kill process on specific port (if needed)
-$port = 8000
-Get-NetTCPConnection -LocalPort $port | ForEach-Object {
-    Stop-Process -Id $_.OwningProcess -Force
-}
 ```
 
 ---
@@ -883,94 +828,34 @@ Get-NetTCPConnection -LocalPort $port | ForEach-Object {
 ## 📁 Project Structure
 
 ```
-lemap-project/
+New folder/                 (Your project root)
 │
-├── docker-compose.yml          # Infrastructure
-├── init.sql                    # Database schema
-├── README_WINDOWS.md           # This file
+├── docker-compose.yml      # Infrastructure
+├── init.sql                # Database schema
+├── README_WINDOWS.md       # This file
 │
-├── gateway/                    # Event Ingestion (Port 8000)
-│   ├── main.py                 # FastAPI app
-│   ├── requirements.txt        # Python dependencies
-│   └── .env                    # Configuration
+├── gateway/                # Event Ingestion (Port 8000)
+│   ├── main.py
+│   ├── requirements.txt
+│   └── .env
 │
-├── processor/                  # Spike Detection
-│   ├── processor.py            # Worker script
-│   ├── simulator.py            # Event generator
-│   ├── requirements.txt        # Python dependencies
-│   └── .env                    # Configuration
+├── processor/              # Spike Detection
+│   ├── processor.py
+│   ├── simulator.py
+│   ├── requirements.txt
+│   └── .env
 │
-├── api/                        # Dashboard Backend (Port 8001)
-│   ├── main.py                 # FastAPI app
-│   ├── requirements.txt        # Python dependencies
-│   └── .env                    # Configuration
+├── api/                    # Dashboard Backend (Port 8001)
+│   ├── main.py
+│   ├── requirements.txt
+│   └── .env
 │
-└── dashboard/                  # Frontend (Port 5173)
-    ├── src/                    # React source code
-    ├── package.json            # Node dependencies
-    └── .env                    # Frontend configuration
+└── HACKATHON/              # Frontend
+    ├── dashboard/          # Your React app (Port 5173)
+    │   └── src/
+    ├── package.json
+    └── .env
 ```
-
----
-
-## 🎯 System Architecture
-
-```
-┌─────────────┐
-│  Simulator  │  Generates random events
-└──────┬──────┘
-       │ POST /event
-       ▼
-┌─────────────┐
-│   Gateway   │  Port 8000 - Event ingestion
-└──────┬──────┘  - Validates events
-       │         - Requires API key
-       │
-       ├─────────────────────┐
-       ▼                     ▼
-┌──────────────┐      ┌──────────────┐
-│  PostgreSQL  │      │    Redis     │
-│              │      │              │
-│ - event      │      │ - counters   │
-│ - alert      │      │ - hub_status │
-└──────┬───────┘      └──────┬───────┘
-       │                     │
-       │      ┌──────────────┘
-       │      ▼
-       │  ┌─────────────┐
-       │  │  Processor  │  Spike detection
-       │  └─────────────┘  - Checks every 30s
-       │         │          - Threshold: 3 events
-       └─────────┴──────┐
-                        ▼
-                ┌──────────────┐
-                │     API      │  Port 8001 - Dashboard backend
-                └──────┬───────┘  GET /events
-                       │          GET /alerts
-                       │          GET /hub-status
-                       ▼
-                ┌──────────────┐
-                │  Dashboard   │  Port 5173 - React UI
-                └──────────────┘  Your existing webpage
-```
-
----
-
-## 🔐 Security Notes
-
-**For Development:**
-- API key: `lemap-secret-key-2024`
-- CORS: Allows all origins (`*`)
-- Database password: `lemap123`
-
-**For Production:**
-- Change API key to strong random string (32+ characters)
-- Restrict CORS to specific domains
-- Use environment variables for all secrets
-- Enable SSL/TLS
-- Use strong database passwords
-- Implement rate limiting
-- Add authentication/authorization
 
 ---
 
@@ -984,41 +869,53 @@ Start-Sleep -Seconds 20
 # 2. Initialize database
 Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 
-# 3. Start services (5 separate PowerShell windows)
+# 3. Install Python packages (no venv needed)
+cd gateway; pip install -r requirements.txt; cd ..
+cd processor; pip install -r requirements.txt; cd ..
+cd api; pip install -r requirements.txt; cd ..
+
+# 4. Install Node packages
+cd HACKATHON; npm install; cd ..
+
+# 5. Start services (5 separate PowerShell windows)
 # Window 1: cd gateway; python main.py
 # Window 2: cd api; python main.py
 # Window 3: cd processor; python processor.py
 # Window 4: cd processor; python simulator.py
-# Window 5: cd dashboard; npm run dev
+# Window 5: cd HACKATHON; npm run dev
 
-# 4. Open browser
+# 6. Open browser
 # http://localhost:5173
 ```
 
 ---
 
-## 🎓 Learning Resources
+## 🎯 Dashboard Integration
 
-- **Docker Desktop**: https://docs.docker.com/desktop/
-- **FastAPI**: https://fastapi.tiangolo.com/
-- **React**: https://react.dev/
-- **PostgreSQL**: https://www.postgresql.org/docs/
-- **Redis**: https://redis.io/docs/
-- **PowerShell**: https://learn.microsoft.com/powershell/
+Your dashboard in `HACKATHON/dashboard/` should call these endpoints:
 
----
+```javascript
+// Get all events
+fetch('http://localhost:8001/events')
+  .then(res => res.json())
+  .then(events => console.log(events));
 
-## 📞 Support Checklist
+// Get events from specific hub
+fetch('http://localhost:8001/events?hub=Delhi')
+  .then(res => res.json())
+  .then(events => console.log(events));
 
-If something doesn't work, check:
+// Get all alerts
+fetch('http://localhost:8001/alerts')
+  .then(res => res.json())
+  .then(alerts => console.log(alerts));
 
-- [ ] Docker Desktop is running (whale icon in tray)
-- [ ] All `.env` files are created with correct values
-- [ ] `127.0.0.1` is used (not `localhost`) in `.env` files
-- [ ] `init.sql` was run successfully
-- [ ] All 5 services are running in separate terminals
-- [ ] No port conflicts (5432, 6379, 8000, 8001, 5173)
-- [ ] Firewall allows connections to these ports
+// Get hub status
+fetch('http://localhost:8001/hub-status')
+  .then(res => res.json())
+  .then(status => console.log(status));
+  // Returns: {"Delhi": "red", "Mumbai": "green", ...}
+```
 
 ---
 
