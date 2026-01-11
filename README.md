@@ -2,6 +2,8 @@
 
 **Real-time Logistics Event Monitoring & Alerting Platform for Windows**
 
+> **Project Location:** `C:\Users\adity\OneDrive\Desktop\New folder\`
+
 ---
 
 ## 📋 Table of Contents
@@ -33,9 +35,6 @@
    - Download: https://nodejs.org/
    - Choose LTS version
 
-4. **Git** (optional, for cloning)
-   - Download: https://git-scm.com/download/win
-
 ### Verify Installation
 
 Open **PowerShell** and run:
@@ -51,52 +50,27 @@ npm --version
 
 ## 🚀 Installation
 
-### Step 1: Clone/Download Project
+### Step 1: Navigate to Project Folder
 
 ```powershell
-# If using Git
-git clone <your-repo-url>
-cd lemap-project
-
-# Or download ZIP and extract
+cd "C:\Users\adity\OneDrive\Desktop\New folder"
 ```
 
-### Step 2: Create Required Files
+### Step 2: Verify Files Exist
 
-#### Create `init.sql` in root folder:
-
-```sql
--- Drop existing tables
-DROP TABLE IF EXISTS alert CASCADE;
-DROP TABLE IF EXISTS event CASCADE;
-
--- Create events table
-CREATE TABLE event (
-    id SERIAL PRIMARY KEY,
-    event_type VARCHAR(50) NOT NULL,
-    hub VARCHAR(50) NOT NULL,
-    description TEXT,
-    timestamp TIMESTAMP DEFAULT NOW()
-);
-
--- Create alerts table
-CREATE TABLE alert (
-    id SERIAL PRIMARY KEY,
-    hub VARCHAR(50) NOT NULL,
-    event_type VARCHAR(50) NOT NULL,
-    message TEXT NOT NULL,
-    timestamp TIMESTAMP DEFAULT NOW()
-);
-
--- Create indexes
-CREATE INDEX idx_event_hub ON event(hub);
-CREATE INDEX idx_event_type ON event(event_type);
-CREATE INDEX idx_event_timestamp ON event(timestamp DESC);
-CREATE INDEX idx_alert_hub ON alert(hub);
-CREATE INDEX idx_alert_timestamp ON alert(timestamp DESC);
+```powershell
+# Check if required files exist
+Test-Path docker-compose.yml
+Test-Path init.sql
+Test-Path gateway\main.py
+Test-Path processor\processor.py
+Test-Path api\main.py
+Test-Path HACKATHON\package.json
 ```
 
-#### Create `.env` files:
+All should return `True`.
+
+### Step 3: Create .env Files (If Not Already Created)
 
 **gateway/.env:**
 ```env
@@ -139,41 +113,12 @@ VITE_API_BASE=http://localhost:8001
 VITE_ALERTS_BASE=http://localhost:8001
 ```
 
-### Step 3: Verify docker-compose.yml
-
-Ensure your `docker-compose.yml` looks like this:
-
-```yaml
-version: "3.8"
-
-services:
-  postgres:
-    image: postgres:15
-    container_name: lemap_postgres
-    environment:
-      POSTGRES_DB: lemapdb
-      POSTGRES_USER: lemap
-      POSTGRES_PASSWORD: lemap123
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  redis:
-    image: redis:7
-    container_name: lemap_redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-
-volumes:
-  pgdata:
-```
-
 ### Step 4: Start Docker Services
 
 ```powershell
+# Make sure you're in the "New folder" directory
+cd "C:\Users\adity\OneDrive\Desktop\New folder"
+
 # Start Docker containers
 docker-compose up -d
 
@@ -182,21 +127,19 @@ Start-Sleep -Seconds 20
 
 # Verify containers are running
 docker ps
+```
 
-# You should see:
-# lemap_postgres
-# lemap_redis
+You should see:
+```
+lemap_postgres
+lemap_redis
 ```
 
 ### Step 5: Initialize Database
 
 ```powershell
-# Method 1: Using Get-Content (recommended)
+# Initialize database schema
 Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
-
-# Method 2: If above fails
-docker cp init.sql lemap_postgres:/tmp/init.sql
-docker exec lemap_postgres psql -U lemap -d lemapdb -f /tmp/init.sql
 
 # Verify tables created
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "\dt"
@@ -211,11 +154,14 @@ Expected output:
  public | event | table | lemap
 ```
 
-### Step 6: Install Python Dependencies (Without Virtual Environment)
+### Step 6: Install Python Dependencies (Skip Virtual Environment)
 
-**If you got the venv permission error, just install directly:**
+Since you had venv permission issues, install directly:
 
 ```powershell
+# Make sure you're in project root
+cd "C:\Users\adity\OneDrive\Desktop\New folder"
+
 # Install Gateway dependencies
 cd gateway
 pip install -r requirements.txt
@@ -232,21 +178,10 @@ pip install -r requirements.txt
 cd ..
 ```
 
-**Optional: If you want to try venv again:**
-
-```powershell
-# Close ALL Python terminals first
-# Then:
-Remove-Item -Recurse -Force .venv
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Then install dependencies as above
-```
-
 ### Step 7: Install Dashboard Dependencies
 
 ```powershell
+# Install Node packages for dashboard
 cd HACKATHON
 npm install
 cd ..
@@ -261,7 +196,7 @@ You need to open **5 separate PowerShell windows**.
 ### Terminal 1: Gateway API (Port 8000)
 
 ```powershell
-cd gateway
+cd "C:\Users\adity\OneDrive\Desktop\New folder\gateway"
 python main.py
 ```
 
@@ -273,10 +208,12 @@ python main.py
 🌐 Server: http://localhost:8000
 ```
 
+---
+
 ### Terminal 2: Dashboard API (Port 8001)
 
 ```powershell
-cd api
+cd "C:\Users\adity\OneDrive\Desktop\New folder\api"
 python main.py
 ```
 
@@ -290,10 +227,12 @@ python main.py
 🌐 Server: http://localhost:8001
 ```
 
+---
+
 ### Terminal 3: Event Processor
 
 ```powershell
-cd processor
+cd "C:\Users\adity\OneDrive\Desktop\New folder\processor"
 python processor.py
 ```
 
@@ -304,10 +243,12 @@ python processor.py
 ⏱️  Check Interval: 30 seconds
 ```
 
+---
+
 ### Terminal 4: Event Simulator
 
 ```powershell
-cd processor
+cd "C:\Users\adity\OneDrive\Desktop\New folder\processor"
 python simulator.py
 ```
 
@@ -315,12 +256,15 @@ python simulator.py
 ```
 🎲 LEMAP Event Simulator Started
 📊 Mode: normal
+[10:30:45] ✅ [1] Delhi | ORDER_DELAYED
 ```
+
+---
 
 ### Terminal 5: React Dashboard
 
 ```powershell
-cd HACKATHON
+cd "C:\Users\adity\OneDrive\Desktop\New folder\HACKATHON"
 npm run dev
 ```
 
@@ -329,7 +273,6 @@ npm run dev
   VITE v5.x.x  ready in xxx ms
 
   ➜  Local:   http://localhost:5173/
-  ➜  Network: use --host to expose
 ```
 
 ---
@@ -371,40 +314,23 @@ Content-Type: application/json
 - `Chennai`
 - `Hyderabad`
 
-**Response:**
-```json
-{
-  "status": "ok",
-  "message": "Event recorded successfully",
-  "event_id": 123,
-  "timestamp": "2026-01-08T23:45:12"
-}
-```
-
 ---
 
 ### Dashboard API (Port 8001)
 
-#### `GET /events`
+#### 1. `GET /events`
 Get all events with optional filtering.
 
 **Query Parameters:**
-- `hub` (optional): Filter by hub name (e.g., `Delhi`)
-- `limit` (optional): Maximum number of events (default: 100)
+- `hub` (optional): Filter by hub name
+- `limit` (optional): Max events (default: 100)
 
 **Examples:**
-```powershell
-# Get all events
-Invoke-WebRequest http://localhost:8001/events
-
-# Get events from Delhi only
-Invoke-WebRequest "http://localhost:8001/events?hub=Delhi"
-
-# Get last 50 events
-Invoke-WebRequest "http://localhost:8001/events?limit=50"
-
-# Get last 50 events from Mumbai
-Invoke-WebRequest "http://localhost:8001/events?hub=Mumbai&limit=50"
+```javascript
+// In your dashboard code
+fetch('http://localhost:8001/events')
+fetch('http://localhost:8001/events?hub=Delhi')
+fetch('http://localhost:8001/events?limit=50')
 ```
 
 **Response:**
@@ -422,23 +348,19 @@ Invoke-WebRequest "http://localhost:8001/events?hub=Mumbai&limit=50"
 
 ---
 
-#### `GET /alerts`
+#### 2. `GET /alerts`
 Get all alerts with optional filtering.
 
 **Query Parameters:**
-- `hub` (optional): Filter by hub name (e.g., `Delhi`)
-- `limit` (optional): Maximum number of alerts (default: 100)
+- `hub` (optional): Filter by hub name
+- `limit` (optional): Max alerts (default: 100)
 
 **Examples:**
-```powershell
-# Get all alerts
-Invoke-WebRequest http://localhost:8001/alerts
-
-# Get alerts from Delhi only
-Invoke-WebRequest "http://localhost:8001/alerts?hub=Delhi"
-
-# Get last 20 alerts
-Invoke-WebRequest "http://localhost:8001/alerts?limit=20"
+```javascript
+// In your dashboard code
+fetch('http://localhost:8001/alerts')
+fetch('http://localhost:8001/alerts?hub=Delhi')
+fetch('http://localhost:8001/alerts?limit=20')
 ```
 
 **Response:**
@@ -456,12 +378,13 @@ Invoke-WebRequest "http://localhost:8001/alerts?limit=20"
 
 ---
 
-#### `GET /hub-status`
-Get health status for all hubs.
+#### 3. `GET /hub-status`
+Get health status for all hubs (red/green).
 
 **Example:**
-```powershell
-Invoke-WebRequest http://localhost:8001/hub-status
+```javascript
+// In your dashboard code
+fetch('http://localhost:8001/hub-status')
 ```
 
 **Response:**
@@ -475,14 +398,14 @@ Invoke-WebRequest http://localhost:8001/hub-status
 }
 ```
 
-- `"green"` = Hub is operational
-- `"red"` = Hub has active alerts (spike detected)
+- `"green"` = Hub operational
+- `"red"` = Hub has active alerts
 
 ---
 
 ## 🧪 Testing
 
-### Test 1: Submit Event to Gateway
+### Test 1: Submit Event
 
 ```powershell
 $headers = @{
@@ -499,8 +422,6 @@ $body = @{
 Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
 ```
 
-Expected: `{"status":"ok","message":"Event recorded successfully"}`
-
 ---
 
 ### Test 2: Get Events
@@ -509,7 +430,7 @@ Expected: `{"status":"ok","message":"Event recorded successfully"}`
 # All events
 Invoke-WebRequest http://localhost:8001/events | ConvertFrom-Json
 
-# Events from specific hub
+# Events from Delhi
 Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
 ```
 
@@ -521,7 +442,7 @@ Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
 # All alerts
 Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
 
-# Alerts from specific hub
+# Alerts from Mumbai
 Invoke-WebRequest "http://localhost:8001/alerts?hub=Mumbai" | ConvertFrom-Json
 ```
 
@@ -535,7 +456,7 @@ Invoke-WebRequest http://localhost:8001/hub-status | ConvertFrom-Json
 
 ---
 
-### Test 5: Generate Spike (for alert testing)
+### Test 5: Generate Spike (Trigger Alert)
 
 ```powershell
 # Send 5 similar events to trigger alert
@@ -557,31 +478,28 @@ $body = @{
     Start-Sleep -Seconds 2
 }
 
-# Wait 30 seconds for processor to detect spike
-Write-Host "Waiting 30 seconds for processor..."
+# Wait 30 seconds for processor
+Write-Host "`nWaiting 30 seconds for processor to detect spike..."
 Start-Sleep -Seconds 30
 
 # Check alerts
-Write-Host "Checking alerts..."
+Write-Host "`nChecking alerts..."
 Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
 ```
 
 ---
 
-### Test 6: Check Database Directly
+### Test 6: Check Database
 
 ```powershell
-# View events in database
+# View events
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event ORDER BY timestamp DESC LIMIT 10;"
 
-# View alerts in database
+# View alerts
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert ORDER BY timestamp DESC LIMIT 10;"
 
-# Count events by hub
+# Count by hub
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM event GROUP BY hub;"
-
-# Count alerts by hub
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM alert GROUP BY hub;"
 ```
 
 ---
@@ -590,35 +508,19 @@ docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FRO
 
 Open browser: **http://localhost:5173**
 
-Your dashboard should connect to these 3 endpoints:
-- ✅ `GET /events` - Display all events
-- ✅ `GET /alerts` - Display all alerts  
-- ✅ `GET /hub-status` - Show red/green hub status
+Your dashboard should display data from the 3 API endpoints.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Issue: "Permission denied" creating venv
+### Issue: "Permission denied" creating .venv
 
-**Solution:**
+**Solution:** Skip virtual environment entirely (we did this in Step 6).
 
 ```powershell
-# Option 1: Delete and recreate
-Remove-Item -Recurse -Force .venv
-python -m venv .venv
-
-# Option 2: Skip venv entirely (easier)
-# Just install packages directly without venv
+# Just install packages directly
 cd gateway
-pip install -r requirements.txt
-cd ..
-
-cd processor  
-pip install -r requirements.txt
-cd ..
-
-cd api
 pip install -r requirements.txt
 cd ..
 ```
@@ -629,8 +531,8 @@ cd ..
 
 **Solution:**
 1. Open Docker Desktop
-2. Wait for whale icon to show in system tray
-3. Try again
+2. Wait for whale icon in system tray
+3. Try: `docker ps`
 
 ---
 
@@ -639,15 +541,11 @@ cd ..
 **Solution:**
 
 ```powershell
-# Check what's using the port
+# Check what's using it
 Get-NetTCPConnection -LocalPort 5432
 
-# If PostgreSQL is installed locally, stop it:
+# If local PostgreSQL, stop it
 Stop-Service postgresql-x64-*
-
-# Or use a different port in docker-compose.yml:
-# Change ports to: "5433:5432"
-# Then update all .env files: DB_PORT=5433
 ```
 
 ---
@@ -663,7 +561,7 @@ docker volume prune -f
 docker-compose up -d
 Start-Sleep -Seconds 20
 
-# Reinitialize database
+# Reinitialize
 Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 ```
 
@@ -674,10 +572,8 @@ Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 **Solution:**
 
 ```powershell
-# Make sure you're in the project root
-# Then reinstall dependencies
-
-cd gateway
+# Reinstall
+cd "C:\Users\adity\OneDrive\Desktop\New folder\gateway"
 pip install -r requirements.txt
 cd ..
 
@@ -692,7 +588,7 @@ cd ..
 
 ---
 
-### Issue: "Dashboard shows 'Cannot connect to API'"
+### Issue: Dashboard can't connect to API
 
 **Solution:**
 
@@ -701,8 +597,9 @@ cd ..
    Invoke-WebRequest http://localhost:8001/events
    ```
 
-2. **Check HACKATHON/.env file:**
+2. **Check HACKATHON/.env:**
    ```powershell
+   cd "C:\Users\adity\OneDrive\Desktop\New folder"
    Get-Content HACKATHON\.env
    ```
    Should show: `VITE_API_BASE=http://localhost:8001`
@@ -713,92 +610,51 @@ cd ..
    npm run dev
    ```
 
-4. **Check browser console** (F12) for errors
+---
+
+### Issue: No alerts generated
+
+**Explanation:** Processor needs 3+ similar events (same type + hub) within 10 minutes.
+
+**Solution:** Use Test 5 above to generate a spike.
 
 ---
 
-### Issue: "npm: command not found"
-
-**Solution:**
+## 📊 Quick Commands
 
 ```powershell
-# Install Node.js from https://nodejs.org/
-# Restart PowerShell after installation
-# Verify:
-node --version
-npm --version
-```
+# Navigate to project
+cd "C:\Users\adity\OneDrive\Desktop\New folder"
 
----
-
-### Issue: "No alerts generated"
-
-**Solution:**
-
-The processor needs **3 or more similar events** (same type + same hub) within 10 minutes to trigger an alert.
-
-```powershell
-# Generate spike manually
-$headers = @{"X-API-Key"="lemap-secret-key-2024"; "Content-Type"="application/json"}
-$body = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Spike test"} | ConvertTo-Json
-
-# Send 5 events
-1..5 | ForEach-Object {
-    Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
-    Start-Sleep -Seconds 2
-}
-
-# Wait 30 seconds for processor
-Start-Sleep -Seconds 30
-
-# Check alerts
-Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
-```
-
----
-
-## 📊 Quick Commands Reference
-
-```powershell
 # ========================================
-# Docker Commands
+# Docker
 # ========================================
 
-# Start services
+# Start
 docker-compose up -d
 
-# Stop services
+# Stop
 docker-compose down
+
+# Reset (deletes all data)
+docker-compose down -v
+docker volume prune -f
+docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Restart services
-docker-compose restart
-
-# Complete reset (deletes all data)
-docker-compose down -v
-docker volume prune -f
-docker-compose up -d
-Start-Sleep -Seconds 20
-
 # ========================================
-# Database Commands
+# Database
 # ========================================
 
-# View recent events
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event ORDER BY timestamp DESC LIMIT 10;"
+# View events
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event LIMIT 10;"
 
-# View recent alerts
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert ORDER BY timestamp DESC LIMIT 10;"
+# View alerts
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert LIMIT 10;"
 
-# Count events
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT COUNT(*) FROM event;"
-
-# Events by hub
-docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM event GROUP BY hub;"
-
-# Clear all data
+# Clear data
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "TRUNCATE event, alert RESTART IDENTITY;"
 
 # ========================================
@@ -806,35 +662,32 @@ docker exec lemap_postgres psql -U lemap -d lemapdb -c "TRUNCATE event, alert RE
 # ========================================
 
 # Submit event
-$headers = @{"X-API-Key"="lemap-secret-key-2024"; "Content-Type"="application/json"}
-$body = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Test"} | ConvertTo-Json
-Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
+$h = @{"X-API-Key"="lemap-secret-key-2024"; "Content-Type"="application/json"}
+$b = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Test"} | ConvertTo-Json
+Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $h -Body $b
 
-# Get all events
-Invoke-WebRequest http://localhost:8001/events | ConvertFrom-Json
+# Get events
+Invoke-WebRequest http://localhost:8001/events
 
-# Get events from specific hub
-Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
-
-# Get all alerts
-Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
+# Get alerts
+Invoke-WebRequest http://localhost:8001/alerts
 
 # Get hub status
-Invoke-WebRequest http://localhost:8001/hub-status | ConvertFrom-Json
+Invoke-WebRequest http://localhost:8001/hub-status
 ```
 
 ---
 
-## 📁 Project Structure
+## 📁 Your Folder Structure
 
 ```
-New folder/                 (Your project root)
+C:\Users\adity\OneDrive\Desktop\New folder\
 │
 ├── docker-compose.yml      # Infrastructure
 ├── init.sql                # Database schema
 ├── README_WINDOWS.md       # This file
 │
-├── gateway/                # Event Ingestion (Port 8000)
+├── gateway/                # Port 8000 - Event Ingestion
 │   ├── main.py
 │   ├── requirements.txt
 │   └── .env
@@ -845,80 +698,94 @@ New folder/                 (Your project root)
 │   ├── requirements.txt
 │   └── .env
 │
-├── api/                    # Dashboard Backend (Port 8001)
+├── api/                    # Port 8001 - Dashboard Backend
 │   ├── main.py
 │   ├── requirements.txt
 │   └── .env
 │
 └── HACKATHON/              # Frontend
-    ├── dashboard/          # Your React app (Port 5173)
+    ├── dashboard/          # Port 5173 - Your React app
     │   └── src/
     ├── package.json
+    ├── package-lock.json
     └── .env
 ```
 
 ---
 
-## 🚀 Quick Start Summary
+## 🚀 Quick Start (Copy-Paste This!)
 
 ```powershell
-# 1. Start Docker
+# 1. Navigate to project
+cd "C:\Users\adity\OneDrive\Desktop\New folder"
+
+# 2. Start Docker
 docker-compose up -d
 Start-Sleep -Seconds 20
 
-# 2. Initialize database
+# 3. Initialize database
 Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 
-# 3. Install Python packages (no venv needed)
+# 4. Install Python packages (if not done)
 cd gateway; pip install -r requirements.txt; cd ..
 cd processor; pip install -r requirements.txt; cd ..
 cd api; pip install -r requirements.txt; cd ..
 
-# 4. Install Node packages
+# 5. Install Node packages (if not done)
 cd HACKATHON; npm install; cd ..
 
-# 5. Start services (5 separate PowerShell windows)
-# Window 1: cd gateway; python main.py
-# Window 2: cd api; python main.py
-# Window 3: cd processor; python processor.py
-# Window 4: cd processor; python simulator.py
-# Window 5: cd HACKATHON; npm run dev
+# 6. Open 5 PowerShell windows and run:
+# Window 1: cd "C:\Users\adity\OneDrive\Desktop\New folder\gateway"; python main.py
+# Window 2: cd "C:\Users\adity\OneDrive\Desktop\New folder\api"; python main.py
+# Window 3: cd "C:\Users\adity\OneDrive\Desktop\New folder\processor"; python processor.py
+# Window 4: cd "C:\Users\adity\OneDrive\Desktop\New folder\processor"; python simulator.py
+# Window 5: cd "C:\Users\adity\OneDrive\Desktop\New folder\HACKATHON"; npm run dev
 
-# 6. Open browser
-# http://localhost:5173
+# 7. Open browser: http://localhost:5173
 ```
 
 ---
 
 ## 🎯 Dashboard Integration
 
-Your dashboard in `HACKATHON/dashboard/` should call these endpoints:
+Your dashboard in `HACKATHON/dashboard/src/` should call:
 
 ```javascript
-// Get all events
+// 1. Get all events
 fetch('http://localhost:8001/events')
   .then(res => res.json())
-  .then(events => console.log(events));
+  .then(data => {
+    // Display events in your UI
+    console.log('Events:', data);
+  });
 
-// Get events from specific hub
-fetch('http://localhost:8001/events?hub=Delhi')
-  .then(res => res.json())
-  .then(events => console.log(events));
-
-// Get all alerts
+// 2. Get alerts
 fetch('http://localhost:8001/alerts')
   .then(res => res.json())
-  .then(alerts => console.log(alerts));
+  .then(data => {
+    // Display alerts in your UI
+    console.log('Alerts:', data);
+  });
 
-// Get hub status
+// 3. Get hub status (red/green)
 fetch('http://localhost:8001/hub-status')
   .then(res => res.json())
-  .then(status => console.log(status));
-  // Returns: {"Delhi": "red", "Mumbai": "green", ...}
+  .then(data => {
+    // Display hub status indicators
+    console.log('Hub Status:', data);
+    // e.g., {"Delhi": "red", "Mumbai": "green", ...}
+  });
+
+// 4. Filter by hub
+fetch('http://localhost:8001/events?hub=Delhi')
+  .then(res => res.json())
+  .then(data => {
+    // Display only Delhi events
+  });
 ```
 
 ---
 
-**Built for Windows • Optimized for Hackathons • Production-Ready Architecture**
+**Everything you need is in: `C:\Users\adity\OneDrive\Desktop\New folder\`**
 
 🎉 Happy Hacking!
