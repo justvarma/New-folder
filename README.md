@@ -9,6 +9,7 @@
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Running the System](#running-the-system)
+- [API Endpoints](#api-endpoints)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 - [Quick Commands](#quick-commands)
@@ -132,7 +133,7 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 ```
 
-**HACKATHON/.env:**
+**dashboard/.env:**
 ```env
 VITE_API_BASE=http://localhost:8001
 VITE_ALERTS_BASE=http://localhost:8001
@@ -236,7 +237,7 @@ cd ..
 ### Step 7: Install Dashboard Dependencies
 
 ```powershell
-cd HACKATHON
+cd dashboard
 npm install
 cd ..
 ```
@@ -247,7 +248,7 @@ cd ..
 
 You need to open **5 separate PowerShell windows**.
 
-### Terminal 1: Gateway API
+### Terminal 1: Gateway API (Port 8000)
 
 ```powershell
 # Activate venv if you created one
@@ -259,10 +260,13 @@ python main.py
 
 ✅ Should show:
 ```
-🚀 Starting LEMAP Event Gateway on http://localhost:8000
+🚀 LEMAP Event Gateway
+📡 Available Endpoints:
+   POST /event        - Submit new event (requires API key)
+🌐 Server: http://localhost:8000
 ```
 
-### Terminal 2: Dashboard API
+### Terminal 2: Dashboard API (Port 8001)
 
 ```powershell
 # Activate venv if you created one
@@ -274,7 +278,12 @@ python main.py
 
 ✅ Should show:
 ```
-🚀 Starting LEMAP Dashboard API on http://localhost:8001
+🚀 LEMAP Dashboard API
+📡 Available Endpoints:
+   GET  /events       - Get all events
+   GET  /alerts       - Get all alerts
+   GET  /hub-status   - Get hub health status
+🌐 Server: http://localhost:8001
 ```
 
 ### Terminal 3: Event Processor
@@ -290,6 +299,8 @@ python processor.py
 ✅ Should show:
 ```
 🚀 LEMAP Event Processor Started Successfully
+⚙️  Spike Threshold: 3 events
+⏱️  Check Interval: 30 seconds
 ```
 
 ### Terminal 4: Event Simulator
@@ -305,37 +316,175 @@ python simulator.py
 ✅ Should show:
 ```
 🎲 LEMAP Event Simulator Started
+📊 Mode: normal
 ```
 
 ### Terminal 5: React Dashboard
 
 ```powershell
-cd HACKATHON
+cd dashboard
 npm run dev
 ```
 
 ✅ Should show:
 ```
-Local: http://localhost:5173/
+  VITE v5.x.x  ready in xxx ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
 ```
+
+---
+
+## 📡 API Endpoints
+
+### Gateway API (Port 8000)
+
+#### `POST /event`
+Submit a new logistics event.
+
+**Headers:**
+```
+X-API-Key: lemap-secret-key-2024
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "event_type": "ORDER_DELAYED",
+  "hub": "Delhi",
+  "description": "Traffic delay of 40 minutes"
+}
+```
+
+**Valid Event Types:**
+- `ORDER_DELAYED`
+- `DELIVERY_FAILED`
+- `INVENTORY_LOW`
+- `VEHICLE_BREAKDOWN`
+- `ROUTE_BLOCKED`
+- `HUB_OVERLOAD`
+
+**Valid Hubs:**
+- `Delhi`
+- `Mumbai`
+- `Bangalore`
+- `Chennai`
+- `Hyderabad`
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "Event recorded successfully",
+  "event_id": 123,
+  "timestamp": "2026-01-08T23:45:12"
+}
+```
+
+---
+
+### Dashboard API (Port 8001)
+
+#### `GET /events`
+Get all events with optional filtering.
+
+**Query Parameters:**
+- `hub` (optional): Filter by hub name (e.g., `Delhi`)
+- `limit` (optional): Maximum number of events (default: 100)
+
+**Examples:**
+```powershell
+# Get all events
+Invoke-WebRequest http://localhost:8001/events
+
+# Get events from Delhi only
+Invoke-WebRequest "http://localhost:8001/events?hub=Delhi"
+
+# Get last 50 events
+Invoke-WebRequest "http://localhost:8001/events?limit=50"
+
+# Get last 50 events from Mumbai
+Invoke-WebRequest "http://localhost:8001/events?hub=Mumbai&limit=50"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 123,
+    "event_type": "ORDER_DELAYED",
+    "hub": "Delhi",
+    "description": "Traffic delay",
+    "timestamp": "2026-01-08T23:45:12"
+  }
+]
+```
+
+---
+
+#### `GET /alerts`
+Get all alerts with optional filtering.
+
+**Query Parameters:**
+- `hub` (optional): Filter by hub name (e.g., `Delhi`)
+- `limit` (optional): Maximum number of alerts (default: 100)
+
+**Examples:**
+```powershell
+# Get all alerts
+Invoke-WebRequest http://localhost:8001/alerts
+
+# Get alerts from Delhi only
+Invoke-WebRequest "http://localhost:8001/alerts?hub=Delhi"
+
+# Get last 20 alerts
+Invoke-WebRequest "http://localhost:8001/alerts?limit=20"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 5,
+    "hub": "Delhi",
+    "event_type": "ORDER_DELAYED",
+    "message": "⚠️ Spike detected: 5 ORDER_DELAYED events at Delhi",
+    "timestamp": "2026-01-08T23:50:00"
+  }
+]
+```
+
+---
+
+#### `GET /hub-status`
+Get health status for all hubs.
+
+**Example:**
+```powershell
+Invoke-WebRequest http://localhost:8001/hub-status
+```
+
+**Response:**
+```json
+{
+  "Delhi": "red",
+  "Mumbai": "green",
+  "Bangalore": "green",
+  "Chennai": "green",
+  "Hyderabad": "green"
+}
+```
+
+- `"green"` = Hub is operational
+- `"red"` = Hub has active alerts (spike detected)
 
 ---
 
 ## 🧪 Testing
 
-### Test 1: Health Checks
-
-```powershell
-# Test Gateway
-Invoke-WebRequest http://localhost:8000/health | Select-Object -ExpandProperty Content
-
-# Test API
-Invoke-WebRequest http://localhost:8001/health | Select-Object -ExpandProperty Content
-```
-
-Expected: `{"gateway":"ok","postgres":"ok","redis":"ok"}`
-
-### Test 2: Submit Test Event
+### Test 1: Submit Event to Gateway
 
 ```powershell
 $headers = @{
@@ -352,29 +501,119 @@ $body = @{
 Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
 ```
 
-### Test 3: View Data
+Expected: `{"status":"ok","message":"Event recorded successfully"}`
+
+---
+
+### Test 2: Get Events
 
 ```powershell
-# Get events
-Invoke-WebRequest http://localhost:8001/events | Select-Object -ExpandProperty Content
+# All events
+Invoke-WebRequest http://localhost:8001/events | ConvertFrom-Json
 
-# Get alerts
-Invoke-WebRequest http://localhost:8001/alerts | Select-Object -ExpandProperty Content
-
-# Get hub status
-Invoke-WebRequest http://localhost:8001/hub-status | Select-Object -ExpandProperty Content
+# Events from specific hub
+Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
 ```
 
-### Test 4: Access Dashboard
+---
+
+### Test 3: Get Alerts
+
+```powershell
+# All alerts
+Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
+
+# Alerts from specific hub
+Invoke-WebRequest "http://localhost:8001/alerts?hub=Mumbai" | ConvertFrom-Json
+```
+
+---
+
+### Test 4: Get Hub Status
+
+```powershell
+Invoke-WebRequest http://localhost:8001/hub-status | ConvertFrom-Json
+```
+
+---
+
+### Test 5: Generate Spike (for alert testing)
+
+```powershell
+# Send 5 similar events to trigger alert
+$headers = @{
+    "X-API-Key" = "lemap-secret-key-2024"
+    "Content-Type" = "application/json"
+}
+
+$body = @{
+    event_type = "ORDER_DELAYED"
+    hub = "Delhi"
+    description = "Spike test"
+} | ConvertTo-Json
+
+# Send 5 events
+1..5 | ForEach-Object {
+    Write-Host "Sending event $_..."
+    Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
+    Start-Sleep -Seconds 2
+}
+
+# Wait 30 seconds for processor to detect spike
+Write-Host "Waiting 30 seconds for processor..."
+Start-Sleep -Seconds 30
+
+# Check alerts
+Write-Host "Checking alerts..."
+Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
+```
+
+---
+
+### Test 6: Check Database Directly
+
+```powershell
+# View events in database
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event ORDER BY timestamp DESC LIMIT 10;"
+
+# View alerts in database
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert ORDER BY timestamp DESC LIMIT 10;"
+
+# Count events by hub
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM event GROUP BY hub;"
+
+# Count alerts by hub
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM alert GROUP BY hub;"
+```
+
+---
+
+### Test 7: Check Redis
+
+```powershell
+# View event counters
+docker exec lemap_redis redis-cli KEYS "event_count:*"
+
+# View hub status
+docker exec lemap_redis redis-cli GET "hub_status:Delhi"
+
+# View all hub statuses
+"Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad" | ForEach-Object {
+    $status = docker exec lemap_redis redis-cli GET "hub_status:$_"
+    Write-Host "$_ : $status"
+}
+```
+
+---
+
+### Test 8: Access Dashboard
 
 Open browser: **http://localhost:5173**
 
-You should see:
-- ✅ Hub filter buttons (All Hubs, Delhi, Mumbai, etc.)
-- ✅ Hub status cards with red/green indicators
-- ✅ Live events feed
-- ✅ Alerts feed
-- ✅ Statistics
+Your dashboard should show:
+- ✅ Events list (with hub filter option)
+- ✅ Alerts list (with hub filter option)
+- ✅ Hub status indicators (red/green)
 
 ---
 
@@ -401,8 +640,8 @@ Get-NetTCPConnection -LocalPort 5432
 Stop-Service postgresql-x64-*
 
 # Or use a different port in docker-compose.yml:
-ports:
-  - "5433:5432"  # Then update .env files to use 5433
+# Change ports to: "5433:5432"
+# Then update all .env files: DB_PORT=5433
 ```
 
 ---
@@ -424,7 +663,7 @@ Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 
 ---
 
-### Issue: "Module not found"
+### Issue: "Module not found" (Python)
 
 **Solution:**
 
@@ -449,10 +688,24 @@ cd ..
 
 **Solution:**
 
-1. Check API is running: `Invoke-WebRequest http://localhost:8001/health`
-2. Check CORS in `api/main.py`: Should have `allow_origins=["*"]`
-3. Check `HACKATHON/.env`: Should have `VITE_API_BASE=http://localhost:8001`
-4. Restart dashboard: `npm run dev`
+1. **Check API is running:**
+   ```powershell
+   Invoke-WebRequest http://localhost:8001/events
+   ```
+
+2. **Check dashboard .env file:**
+   ```powershell
+   Get-Content dashboard\.env
+   ```
+   Should show: `VITE_API_BASE=http://localhost:8001`
+
+3. **Restart dashboard:**
+   ```powershell
+   cd dashboard
+   npm run dev
+   ```
+
+4. **Check browser console** (F12) for errors
 
 ---
 
@@ -460,14 +713,14 @@ cd ..
 
 **Solution:**
 
-The processor needs 3+ similar events to trigger an alert.
+The processor needs **3 or more similar events** (same type + same hub) within 10 minutes to trigger an alert.
 
 ```powershell
 # Generate spike manually
 $headers = @{"X-API-Key"="lemap-secret-key-2024"; "Content-Type"="application/json"}
 $body = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Spike test"} | ConvertTo-Json
 
-# Send 5 events quickly
+# Send 5 events
 1..5 | ForEach-Object {
     Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
     Start-Sleep -Seconds 2
@@ -477,7 +730,25 @@ $body = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Spike test"} | C
 Start-Sleep -Seconds 30
 
 # Check alerts
-Invoke-WebRequest http://localhost:8001/alerts | Select-Object -ExpandProperty Content
+Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
+```
+
+---
+
+### Issue: "Simulator not generating events"
+
+**Solution:**
+
+```powershell
+# Check if Gateway is running
+Invoke-WebRequest http://localhost:8000/docs
+
+# Check simulator logs - should show:
+# ✅ [1] Delhi | ORDER_DELAYED
+
+# If showing connection errors:
+# 1. Verify Gateway is running on port 8000
+# 2. Check API_KEY in processor/.env matches gateway/.env
 ```
 
 ---
@@ -498,13 +769,24 @@ docker-compose down
 # View logs
 docker-compose logs -f
 
+# View specific service logs
+docker-compose logs -f postgres
+docker-compose logs -f redis
+
 # Restart services
 docker-compose restart
 
-# Complete reset
+# Complete reset (deletes all data)
 docker-compose down -v
 docker volume prune -f
 docker-compose up -d
+Start-Sleep -Seconds 20
+
+# Check running containers
+docker ps
+
+# Check container resource usage
+docker stats
 
 # ========================================
 # Database Commands
@@ -513,11 +795,23 @@ docker-compose up -d
 # Connect to PostgreSQL
 docker exec -it lemap_postgres psql -U lemap -d lemapdb
 
-# View events
+# View recent events
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM event ORDER BY timestamp DESC LIMIT 10;"
 
-# View alerts
+# View recent alerts
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT * FROM alert ORDER BY timestamp DESC LIMIT 10;"
+
+# Count events
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT COUNT(*) FROM event;"
+
+# Count alerts
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT COUNT(*) FROM alert;"
+
+# Events by hub
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM event GROUP BY hub;"
+
+# Alerts by hub
+docker exec lemap_postgres psql -U lemap -d lemapdb -c "SELECT hub, COUNT(*) FROM alert GROUP BY hub;"
 
 # Clear all data
 docker exec lemap_postgres psql -U lemap -d lemapdb -c "TRUNCATE event, alert RESTART IDENTITY;"
@@ -535,27 +829,53 @@ docker exec lemap_redis redis-cli KEYS "*"
 # View event counters
 docker exec lemap_redis redis-cli KEYS "event_count:*"
 
+# View specific counter
+docker exec lemap_redis redis-cli GET "event_count:ORDER_DELAYED:Delhi"
+
 # View hub status
 docker exec lemap_redis redis-cli GET "hub_status:Delhi"
+
+# Clear all Redis data
+docker exec lemap_redis redis-cli FLUSHALL
 
 # ========================================
 # API Testing
 # ========================================
-
-# Health checks
-Invoke-WebRequest http://localhost:8000/health
-Invoke-WebRequest http://localhost:8001/health
 
 # Submit event
 $headers = @{"X-API-Key"="lemap-secret-key-2024"; "Content-Type"="application/json"}
 $body = @{event_type="ORDER_DELAYED"; hub="Delhi"; description="Test"} | ConvertTo-Json
 Invoke-WebRequest -Uri http://localhost:8000/event -Method POST -Headers $headers -Body $body
 
-# Get data
-Invoke-WebRequest http://localhost:8001/events
-Invoke-WebRequest http://localhost:8001/alerts
-Invoke-WebRequest http://localhost:8001/hub-status
-Invoke-WebRequest http://localhost:8001/stats
+# Get all events
+Invoke-WebRequest http://localhost:8001/events | ConvertFrom-Json
+
+# Get events from specific hub
+Invoke-WebRequest "http://localhost:8001/events?hub=Delhi" | ConvertFrom-Json
+
+# Get all alerts
+Invoke-WebRequest http://localhost:8001/alerts | ConvertFrom-Json
+
+# Get alerts from specific hub
+Invoke-WebRequest "http://localhost:8001/alerts?hub=Mumbai" | ConvertFrom-Json
+
+# Get hub status
+Invoke-WebRequest http://localhost:8001/hub-status | ConvertFrom-Json
+
+# ========================================
+# Service Management
+# ========================================
+
+# Check if services are responding
+Invoke-WebRequest http://localhost:8000/docs  # Gateway docs
+Invoke-WebRequest http://localhost:8001/docs  # API docs
+Invoke-WebRequest http://localhost:5173       # Dashboard
+
+# Kill process on specific port (if needed)
+$port = 8000
+Get-NetTCPConnection -LocalPort $port | ForEach-Object {
+    Stop-Process -Id $_.OwningProcess -Force
+}
 ```
 
 ---
@@ -570,66 +890,87 @@ lemap-project/
 ├── README_WINDOWS.md           # This file
 │
 ├── gateway/                    # Event Ingestion (Port 8000)
-│   ├── main.py
-│   ├── requirements.txt
-│   └── .env
+│   ├── main.py                 # FastAPI app
+│   ├── requirements.txt        # Python dependencies
+│   └── .env                    # Configuration
 │
 ├── processor/                  # Spike Detection
-│   ├── processor.py            # Worker
+│   ├── processor.py            # Worker script
 │   ├── simulator.py            # Event generator
-│   ├── requirements.txt
-│   └── .env
+│   ├── requirements.txt        # Python dependencies
+│   └── .env                    # Configuration
 │
 ├── api/                        # Dashboard Backend (Port 8001)
-│   ├── main.py
-│   ├── requirements.txt
-│   └── .env
+│   ├── main.py                 # FastAPI app
+│   ├── requirements.txt        # Python dependencies
+│   └── .env                    # Configuration
 │
-└── HACKATHON/                  # Frontend (Port 5173)
-    ├── dashboard/
-    ├── package.json
-    └── .env
+└── dashboard/                  # Frontend (Port 5173)
+    ├── src/                    # React source code
+    ├── package.json            # Node dependencies
+    └── .env                    # Frontend configuration
 ```
 
 ---
 
-## 🎯 Dashboard Features
+## 🎯 System Architecture
 
-### Hub Status Cards
-- Click any hub card to filter events and alerts for that hub
-- Green indicator = Hub operational
-- Red indicator = Hub in alert state
-
-### Event Feed
-- Shows all recent logistics events
-- Color-coded by event type
-- Filters by selected hub
-
-### Alert Feed
-- Shows generated alerts from spike detection
-- Displays hub name and event type
-- Auto-refreshes every 5 seconds
-
-### Statistics
-- Total events count
-- Active alerts count
-- Number of hubs in alert state
+```
+┌─────────────┐
+│  Simulator  │  Generates random events
+└──────┬──────┘
+       │ POST /event
+       ▼
+┌─────────────┐
+│   Gateway   │  Port 8000 - Event ingestion
+└──────┬──────┘  - Validates events
+       │         - Requires API key
+       │
+       ├─────────────────────┐
+       ▼                     ▼
+┌──────────────┐      ┌──────────────┐
+│  PostgreSQL  │      │    Redis     │
+│              │      │              │
+│ - event      │      │ - counters   │
+│ - alert      │      │ - hub_status │
+└──────┬───────┘      └──────┬───────┘
+       │                     │
+       │      ┌──────────────┘
+       │      ▼
+       │  ┌─────────────┐
+       │  │  Processor  │  Spike detection
+       │  └─────────────┘  - Checks every 30s
+       │         │          - Threshold: 3 events
+       └─────────┴──────┐
+                        ▼
+                ┌──────────────┐
+                │     API      │  Port 8001 - Dashboard backend
+                └──────┬───────┘  GET /events
+                       │          GET /alerts
+                       │          GET /hub-status
+                       ▼
+                ┌──────────────┐
+                │  Dashboard   │  Port 5173 - React UI
+                └──────────────┘  Your existing webpage
+```
 
 ---
 
 ## 🔐 Security Notes
 
 **For Development:**
-- API key is hardcoded: `lemap-secret-key-2024`
-- CORS allows all origins: `allow_origins=["*"]`
-- Database uses simple password
+- API key: `lemap-secret-key-2024`
+- CORS: Allows all origins (`*`)
+- Database password: `lemap123`
 
 **For Production:**
-- Change API key to strong random string
+- Change API key to strong random string (32+ characters)
 - Restrict CORS to specific domains
-- Use environment variables for secrets
+- Use environment variables for all secrets
 - Enable SSL/TLS
-- Use strong database password
+- Use strong database passwords
+- Implement rate limiting
+- Add authentication/authorization
 
 ---
 
@@ -643,27 +984,16 @@ Start-Sleep -Seconds 20
 # 2. Initialize database
 Get-Content init.sql | docker exec -i lemap_postgres psql -U lemap -d lemapdb
 
-# 3. Open 5 PowerShell windows and run:
-# Terminal 1: cd gateway; python main.py
-# Terminal 2: cd api; python main.py
-# Terminal 3: cd processor; python processor.py
-# Terminal 4: cd processor; python simulator.py
-# Terminal 5: cd HACKATHON; npm run dev
+# 3. Start services (5 separate PowerShell windows)
+# Window 1: cd gateway; python main.py
+# Window 2: cd api; python main.py
+# Window 3: cd processor; python processor.py
+# Window 4: cd processor; python simulator.py
+# Window 5: cd dashboard; npm run dev
 
 # 4. Open browser
 # http://localhost:5173
 ```
-
----
-
-## 📞 Support
-
-If you encounter issues:
-
-1. Check [Troubleshooting](#troubleshooting) section
-2. View Docker logs: `docker-compose logs`
-3. Check service health: `Invoke-WebRequest http://localhost:8000/health`
-4. Verify containers running: `docker ps`
 
 ---
 
@@ -674,6 +1004,21 @@ If you encounter issues:
 - **React**: https://react.dev/
 - **PostgreSQL**: https://www.postgresql.org/docs/
 - **Redis**: https://redis.io/docs/
+- **PowerShell**: https://learn.microsoft.com/powershell/
+
+---
+
+## 📞 Support Checklist
+
+If something doesn't work, check:
+
+- [ ] Docker Desktop is running (whale icon in tray)
+- [ ] All `.env` files are created with correct values
+- [ ] `127.0.0.1` is used (not `localhost`) in `.env` files
+- [ ] `init.sql` was run successfully
+- [ ] All 5 services are running in separate terminals
+- [ ] No port conflicts (5432, 6379, 8000, 8001, 5173)
+- [ ] Firewall allows connections to these ports
 
 ---
 
