@@ -264,7 +264,7 @@ python simulator.py
 ### Terminal 5: React Dashboard
 
 ```powershell
-cd "C:\Users\adity\OneDrive\Desktop\New folder\HACKATHON"
+cd "C:\Users\adity\OneDrive\Desktop\New folder\HACKATHON\dashboard"
 npm run dev
 ```
 
