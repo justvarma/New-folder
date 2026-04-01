@@ -12,7 +12,7 @@ load_dotenv()
 
 app = FastAPI(title="LEMAP Dashboard API")
 
-# CORS
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,9 +21,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Config
+# ============ CONFIG ============
 DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
     "database": os.getenv("DB_NAME", "lemapdb"),
     "user": os.getenv("DB_USER", "lemap"),
     "password": os.getenv("DB_PASSWORD", "lemap123"),
@@ -31,75 +31,158 @@ DB_CONFIG = {
 }
 
 REDIS_CONFIG = {
-    "host": os.getenv("REDIS_HOST", "localhost"),
+    "host": os.getenv("REDIS_HOST", "127.0.0.1"),
     "port": int(os.getenv("REDIS_PORT", "6379")),
     "decode_responses": True
 }
 
+# Valid hubs
 VALID_HUBS = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad"]
 
-def get_db():
+# ============ DATABASE ============
+def get_db_connection():
+    """PostgreSQL connection with error handling"""
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         return conn
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DB connection failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"DB connection failed: {str(e)}"
+        )
 
-def get_redis():
+# ============ REDIS ============
+def get_redis_connection():
+    """Redis connection with error handling"""
     try:
         r = redis.Redis(**REDIS_CONFIG)
         r.ping()
         return r
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Redis connection failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Redis connection failed: {str(e)}"
+        )
 
-@app.get("/")
-async def root():
-    return {
-        "service": "LEMAP Dashboard API",
-        "status": "running",
-        "endpoints": ["/alerts", "/hub-status", "/events", "/stats"]
-    }
+# ============ ENDPOINTS ============
 
-@app.get("/alerts")
-async def get_alerts(
-        hub: Optional[str] = Query(None, description="Filter by hub"),
-        limit: int = Query(50, description="Max results")
+@app.get("/events")
+async def get_events(
+        hub: Optional[str] = Query(None, description="Filter by hub (e.g., Delhi)"),
+        limit: int = Query(100, description="Max number of events to return")
 ):
     """
-    GET /alerts - Fetch alerts from database
+    GET /events - Get all events
+
+    Optional Query Parameters:
+    - hub: Filter by specific hub (Delhi, Mumbai, Bangalore, Chennai, Hyderabad)
+    - limit: Maximum number of events (default: 100)
+
+    Example:
+    - /events
+    - /events?hub=Delhi
+    - /events?hub=Delhi&limit=50
     """
+    # Validate hub if provided
     if hub and hub not in VALID_HUBS:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid hub. Must be one of: {', '.join(VALID_HUBS)}"
         )
 
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
+        # Build query
         if hub:
             query = """
-                SELECT id, hub, event_type, message, timestamp
-                FROM alert
-                WHERE hub = %s
-                ORDER BY timestamp DESC
+                SELECT id, event_type, hub, description, timestamp 
+                FROM event 
+                WHERE hub = %s 
+                ORDER BY timestamp DESC 
                 LIMIT %s
             """
             cursor.execute(query, (hub, limit))
         else:
             query = """
-                SELECT id, hub, event_type, message, timestamp
-                FROM alert
-                ORDER BY timestamp DESC
+                SELECT id, event_type, hub, description, timestamp 
+                FROM event 
+                ORDER BY timestamp DESC 
+                LIMIT %s
+            """
+            cursor.execute(query, (limit,))
+
+        events = cursor.fetchall()
+
+        # Convert timestamp to ISO format string
+        for event in events:
+            if isinstance(event['timestamp'], datetime):
+                event['timestamp'] = event['timestamp'].isoformat()
+
+        return events
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching events: {str(e)}"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.get("/alerts")
+async def get_alerts(
+        hub: Optional[str] = Query(None, description="Filter by hub (e.g., Delhi)"),
+        limit: int = Query(100, description="Max number of alerts to return")
+):
+    """
+    GET /alerts - Get all alerts
+
+    Optional Query Parameters:
+    - hub: Filter by specific hub (Delhi, Mumbai, Bangalore, Chennai, Hyderabad)
+    - limit: Maximum number of alerts (default: 100)
+
+    Example:
+    - /alerts
+    - /alerts?hub=Delhi
+    - /alerts?hub=Delhi&limit=50
+    """
+    # Validate hub if provided
+    if hub and hub not in VALID_HUBS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid hub. Must be one of: {', '.join(VALID_HUBS)}"
+        )
+
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        # Build query
+        if hub:
+            query = """
+                SELECT id, hub, event_type, message, timestamp 
+                FROM alert 
+                WHERE hub = %s 
+                ORDER BY timestamp DESC 
+                LIMIT %s
+            """
+            cursor.execute(query, (hub, limit))
+        else:
+            query = """
+                SELECT id, hub, event_type, message, timestamp 
+                FROM alert 
+                ORDER BY timestamp DESC 
                 LIMIT %s
             """
             cursor.execute(query, (limit,))
 
         alerts = cursor.fetchall()
 
-        # Convert timestamps
+        # Convert timestamp to ISO format string
         for alert in alerts:
             if isinstance(alert['timestamp'], datetime):
                 alert['timestamp'] = alert['timestamp'].isoformat()
@@ -107,22 +190,37 @@ async def get_alerts(
         return alerts
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching alerts: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching alerts: {str(e)}"
+        )
 
     finally:
         cursor.close()
         conn.close()
 
+
 @app.get("/hub-status")
 async def get_hub_status():
     """
-    GET /hub-status - Get real-time hub health status
-    Returns: {"Delhi": "green", "Mumbai": "red", ...}
+    GET /hub-status - Get health status for all hubs
+
+    Returns:
+    {
+        "Delhi": "green" or "red",
+        "Mumbai": "green" or "red",
+        "Bangalore": "green" or "red",
+        "Chennai": "green" or "red",
+        "Hyderabad": "green" or "red"
+    }
+
+    - green: Hub is operational
+    - red: Hub has active alerts
     """
     try:
-        r = get_redis()
-        status = {}
+        r = get_redis_connection()
 
+        status = {}
         for hub in VALID_HUBS:
             redis_key = f"hub_status:{hub}"
             hub_status = r.get(redis_key)
@@ -133,116 +231,23 @@ async def get_hub_status():
         return status
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching hub status: {str(e)}")
-
-@app.get("/events")
-async def get_events(
-        hub: Optional[str] = Query(None, description="Filter by hub"),
-        event_type: Optional[str] = Query(None, description="Filter by event type"),
-        limit: int = Query(100, description="Max results")
-):
-    """
-    GET /events - Fetch events from database
-    """
-    if hub and hub not in VALID_HUBS:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid hub. Must be one of: {', '.join(VALID_HUBS)}"
+            status_code=500,
+            detail=f"Error fetching hub status: {str(e)}"
         )
 
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        conditions = []
-        params = []
-
-        if hub:
-            conditions.append("hub = %s")
-            params.append(hub)
-
-        if event_type:
-            conditions.append("event_type = %s")
-            params.append(event_type)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        params.append(limit)
-
-        query = f"""
-            SELECT id, event_type, hub, description, timestamp
-            FROM event
-            WHERE {where_clause}
-            ORDER BY timestamp DESC
-            LIMIT %s
-        """
-
-        cursor.execute(query, params)
-        events = cursor.fetchall()
-
-        # Convert timestamps
-        for event in events:
-            if isinstance(event['timestamp'], datetime):
-                event['timestamp'] = event['timestamp'].isoformat()
-
-        return events
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching events: {str(e)}")
-
-    finally:
-        cursor.close()
-        conn.close()
-
-@app.get("/stats")
-async def get_stats():
-    """
-    GET /stats - Get system statistics
-    """
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        # Total events
-        cursor.execute("SELECT COUNT(*) as total FROM event")
-        total_events = cursor.fetchone()['total']
-
-        # Total alerts
-        cursor.execute("SELECT COUNT(*) as total FROM alert")
-        total_alerts = cursor.fetchone()['total']
-
-        # Events by hub
-        cursor.execute("""
-            SELECT hub, COUNT(*) as count
-            FROM event
-            GROUP BY hub
-            ORDER BY count DESC
-        """)
-        events_by_hub = cursor.fetchall()
-
-        # Recent alerts by hub
-        cursor.execute("""
-            SELECT hub, COUNT(*) as count
-            FROM alert
-            WHERE timestamp > NOW() - INTERVAL '1 hour'
-            GROUP BY hub
-            ORDER BY count DESC
-        """)
-        recent_alerts_by_hub = cursor.fetchall()
-
-        return {
-            "total_events": total_events,
-            "total_alerts": total_alerts,
-            "events_by_hub": events_by_hub,
-            "recent_alerts_by_hub": recent_alerts_by_hub
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
-
-    finally:
-        cursor.close()
-        conn.close()
 
 if __name__ == "__main__":
     import uvicorn
+    print("=" * 60)
+    print("🚀 LEMAP Dashboard API")
+    print("=" * 60)
+    print("📡 Available Endpoints:")
+    print("   GET  /events       - Get all events")
+    print("   GET  /alerts       - Get all alerts")
+    print("   GET  /hub-status   - Get hub health status")
+    print("=" * 60)
+    print("🌐 Server: http://localhost:8001")
+    print("📖 Docs: http://localhost:8001/docs")
+    print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=8001)

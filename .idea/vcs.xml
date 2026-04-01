@@ -3,6 +3,8 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/HACKATHON" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/mem1/gateway (1)/gateway" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/HACKATHON/HACKATHON" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Suramon" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/gateway" vcs="Git" />
   </component>
 </project>

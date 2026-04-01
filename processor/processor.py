@@ -4,39 +4,28 @@ import psycopg2
 from dotenv import load_dotenv
 import os
 
+# Load environment variables
 load_dotenv()
 
-print("🚀 LEMAP Event Processor starting...")
+# ============ REDIS CONNECTION ============
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", "6379")),
+    decode_responses=True
+)
 
-# ---------------- REDIS CONNECTION ----------------
-try:
-    redis_client = redis.Redis(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        decode_responses=True
-    )
-    redis_client.ping()
-    print("✅ Redis connected")
-except Exception as e:
-    print(f"❌ Redis connection failed: {e}")
-    exit(1)
-
-# ---------------- POSTGRES CONNECTION ----------------
-try:
-    conn = psycopg2.connect(
+# ============ POSTGRES CONNECTION ============
+def get_db_connection():
+    """Create a fresh DB connection"""
+    return psycopg2.connect(
         dbname=os.getenv("DB_NAME", "lemapdb"),
         user=os.getenv("DB_USER", "lemap"),
         password=os.getenv("DB_PASSWORD", "lemap123"),
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432")
     )
-    cursor = conn.cursor()
-    print("✅ PostgreSQL connected")
-except Exception as e:
-    print(f"❌ PostgreSQL connection failed: {e}")
-    exit(1)
 
-# ---------------- CONSTANTS ----------------
+# ============ CONSTANTS ============
 EVENT_TYPES = [
     "ORDER_DELAYED",
     "DELIVERY_FAILED",
@@ -50,34 +39,42 @@ HUBS = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Hyderabad"]
 
 SPIKE_THRESHOLD = 3        # Number of events to trigger alert
 CHECK_INTERVAL = 30        # Check every 30 seconds
-ALERT_COOLDOWN = 900       # 15 minutes cooldown for same alert
+HUB_RED_DURATION = 900     # Hub stays RED for 15 minutes
 
-print(f"📊 Monitoring {len(HUBS)} hubs for {len(EVENT_TYPES)} event types")
-print(f"⚡ Spike threshold: {SPIKE_THRESHOLD} events")
-print(f"⏱️  Check interval: {CHECK_INTERVAL} seconds")
-print("="*60)
+print("=" * 60)
+print("🚀 LEMAP Event Processor Started Successfully")
+print("=" * 60)
+print(f"⚙️  Spike Threshold: {SPIKE_THRESHOLD} events")
+print(f"⏱️  Check Interval: {CHECK_INTERVAL} seconds")
+print(f"🔴 Hub RED Duration: {HUB_RED_DURATION} seconds")
+print(f"🎯 Monitoring Hubs: {', '.join(HUBS)}")
+print("=" * 60)
 
-# ---------------- MAIN LOOP ----------------
-alert_count = 0
+# ============ MAIN LOOP ============
+loop_count = 0
 
 while True:
-    try:
-        for event_type in EVENT_TYPES:
-            for hub in HUBS:
-                redis_key = f"event_count:{event_type}:{hub}"
+    loop_count += 1
+    print(f"\n[Loop #{loop_count}] Checking for spikes...")
+
+    alerts_generated = 0
+
+    for event_type in EVENT_TYPES:
+        for hub in HUBS:
+            redis_key = f"event_count:{event_type}:{hub}"
+
+            try:
                 count = redis_client.get(redis_key)
 
                 if count and int(count) >= SPIKE_THRESHOLD:
-                    # Check if we already alerted recently (cooldown)
-                    cooldown_key = f"alert_cooldown:{event_type}:{hub}"
-                    if redis_client.exists(cooldown_key):
-                        continue  # Skip, already alerted recently
+                    # Get fresh connection for each alert
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
 
-                    # Generate alert message
-                    message = f"Spike detected: {count} {event_type} events at {hub} hub"
+                    message = f"⚠️ Spike detected: {count} {event_type} events at {hub}"
 
-                    # Insert alert into database
                     try:
+                        # Insert alert
                         cursor.execute(
                             """
                             INSERT INTO alert (hub, event_type, message)
@@ -87,24 +84,29 @@ while True:
                         )
                         conn.commit()
 
-                        # Set hub status to RED
-                        redis_client.set(f"hub_status:{hub}", "red", ex=ALERT_COOLDOWN)
-
-                        # Set cooldown to prevent duplicate alerts
-                        redis_client.set(cooldown_key, "1", ex=ALERT_COOLDOWN)
+                        # Mark hub as RED in Redis
+                        redis_client.set(f"hub_status:{hub}", "red", ex=HUB_RED_DURATION)
 
                         # Reset counter
                         redis_client.delete(redis_key)
 
-                        alert_count += 1
-                        print(f"🚨 ALERT #{alert_count} → {hub} | {event_type} | Count: {count}")
+                        alerts_generated += 1
+                        print(f"  🚨 ALERT: {hub} | {event_type} | Count: {count}")
 
                     except Exception as e:
-                        print(f"❌ Error creating alert: {e}")
                         conn.rollback()
+                        print(f"  ❌ Error generating alert: {e}")
 
-    except Exception as e:
-        print(f"❌ Error in main loop: {e}")
-        time.sleep(5)  # Wait before retrying
+                    finally:
+                        cursor.close()
+                        conn.close()
+
+            except Exception as e:
+                print(f"  ❌ Error checking {event_type} at {hub}: {e}")
+
+    if alerts_generated > 0:
+        print(f"✅ Generated {alerts_generated} alert(s)")
+    else:
+        print("✅ No spikes detected")
 
     time.sleep(CHECK_INTERVAL)
